@@ -1,0 +1,41 @@
+# Data - never commit raw datasets
+data/raw/
+data/processed/
+
+# MLflow artifacts
+mlruns/
+mlartifacts/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+.env/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model binaries
+*.pkl
+*.joblib
+*.h5
+
+# Environment variables
+.env

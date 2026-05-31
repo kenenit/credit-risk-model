@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+
+  # ── Credit Risk API ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: credit_risk_api
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - PYTHONPATH=/app
+    volumes:
+      - ./src:/app/src          # Live-reload during development
+    depends_on:
+      - mlflow
+    restart: unless-stopped
+    networks:
+      - credit_risk_net
+
+  # ── MLflow Tracking Server ─────────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    container_name: mlflow_server
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+        --backend-store-uri sqlite:///mlflow.db
+        --default-artifact-root /mlflow/artifacts
+        --host 0.0.0.0
+        --port 5000
+    volumes:
+      - mlflow_data:/mlflow
+    networks:
+      - credit_risk_net
+
+volumes:
+  mlflow_data:
+
+networks:
+  credit_risk_net:
+    driver: bridge
