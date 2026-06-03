@@ -18,7 +18,6 @@ import os
 
 import mlflow
 import mlflow.sklearn
-import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -38,7 +37,7 @@ from lightgbm import LGBMClassifier
 # ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s — %(name)s — %(levelname)s — %(message)s",
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -117,7 +116,6 @@ MODEL_CONFIGS = {
         "model": XGBClassifier(
             random_state=RANDOM_STATE,
             eval_metric="logloss",
-            use_label_encoder=False,
         ),
         "param_dist": {
             "n_estimators": [100, 200, 300],
@@ -148,7 +146,7 @@ MODEL_CONFIGS = {
 def train_and_track(X_train, X_test, y_train, y_test):
     """
     Train all models with RandomizedSearchCV, log each run to MLflow,
-    and return the name + metrics of the best model.
+    and return the name + run_id + AUC of the best model.
     """
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 
@@ -162,6 +160,7 @@ def train_and_track(X_train, X_test, y_train, y_test):
         logger.info(f"{'='*50}")
 
         with mlflow.start_run(run_name=model_name):
+
             # Hyperparameter search
             search = RandomizedSearchCV(
                 estimator=config["model"],
@@ -179,23 +178,20 @@ def train_and_track(X_train, X_test, y_train, y_test):
             # Evaluate
             metrics = evaluate_model(best_estimator, X_test, y_test)
 
-            # Log params
+            # Log to MLflow
             mlflow.log_params(search.best_params_)
             mlflow.log_param("model_type", model_name)
-
-            # Log metrics
             mlflow.log_metrics(metrics)
-
-            # Log model artifact
             mlflow.sklearn.log_model(best_estimator, artifact_path="model")
 
             run_id = mlflow.active_run().info.run_id
 
             logger.info(f"Best params: {search.best_params_}")
             logger.info(
-                f"Metrics — AUC: {metrics['roc_auc']:.4f} | "
+                f"Metrics - AUC: {metrics['roc_auc']:.4f} | "
                 f"F1: {metrics['f1']:.4f} | "
-                f"Recall: {metrics['recall']:.4f}"
+                f"Recall: {metrics['recall']:.4f} | "
+                f"Precision: {metrics['precision']:.4f}"
             )
 
             if metrics["roc_auc"] > best_auc:
@@ -214,17 +210,18 @@ def register_best_model(run_id: str, model_name: str) -> None:
     model_uri = f"runs:/{run_id}/model"
     logger.info(f"Registering model from run {run_id} as '{REGISTERED_MODEL_NAME}'")
     mlflow.register_model(model_uri=model_uri, name=REGISTERED_MODEL_NAME)
-    logger.info("✅ Model registered successfully.")
+    logger.info("Model registered successfully.")
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+
     # Load data
     X, y = load_processed_data()
 
-    # Train / test split
+    # Train / test split — stratified to preserve class balance
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
     )
@@ -235,8 +232,8 @@ if __name__ == "__main__":
         X_train, X_test, y_train, y_test
     )
 
-    logger.info(f"\n🏆 Best model: {best_name} (ROC-AUC = {best_auc:.4f})")
+    logger.info(f"\nBest model: {best_name} (ROC-AUC = {best_auc:.4f})")
 
-    # Register best model
+    # Register best model in MLflow Model Registry
     register_best_model(best_run_id, best_name)
-    logger.info("✅ Training pipeline complete.")
+    logger.info("Training pipeline complete.")
