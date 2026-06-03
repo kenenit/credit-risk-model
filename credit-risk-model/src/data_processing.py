@@ -161,6 +161,15 @@ def assign_risk_label(rfm: pd.DataFrame) -> pd.DataFrame:
 
     rfm_features = rfm[["recency", "frequency", "monetary"]].copy()
 
+    # Clip monetary outliers at 1st and 99th percentile before clustering
+    # to prevent extreme values (e.g. large negative refunds) from
+    # distorting the K-Means distance calculations
+    for col in ["recency", "frequency", "monetary"]:
+        p01 = rfm_features[col].quantile(0.01)
+        p99 = rfm_features[col].quantile(0.99)
+        rfm_features[col] = rfm_features[col].clip(p01, p99)
+        logger.info(f"  Clipped {col}: [{p01:.1f}, {p99:.1f}]")
+
     # Scale before clustering
     scaler = StandardScaler()
     rfm_scaled = scaler.fit_transform(rfm_features)
